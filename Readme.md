@@ -193,7 +193,7 @@ GET localhost:9205/movies/_search
 4. Rechercher des films par mots-clés dans le résumé
 5. Trouver les films avec les meilleures notes pour une année donnée
 
-### Exemple de solution pour l'exercice 1
+### Trouver tous les films d'un réalisateur spécifique
 ```powershell
 GET localhost:9205/movies/_search
 {
