@@ -440,5 +440,3 @@ Cette visualisation permet de voir rapidement :
 - Les réalisateurs les plus prolifiques
 - La diversité des genres pour chaque réalisateur
 - La distribution des films par genre pour chaque réalisateur
-
-*Note: Les images sont des placeholders et devraient être remplacées par les captures d'écran réelles de votre installation Kibana.*
