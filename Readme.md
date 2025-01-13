@@ -100,82 +100,114 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:9205/_bulk" -ContentType "
 
 ## Requêtes
 
-### 1. Vérification de base
+### 1. Recherche des films de Ridley Scott
+1. Recherche multi-champs
 ```powershell
-# Nombre total de documents
-GET localhost:9205/movies/_count
+curl -X GET "localhost:9205/movies/_search" -H "Content-Type: application/json" -d '{
+  "query": {
+    "multi_match": {
+      "query": "Ridley Scott",
+      "fields": ["fields.directors", "fields.plot", "fields.title"]
+    }
+  }
+}'
+```
 
-# Détails de l'index
-GET localhost:9205/movies
+### 2. Recherche spécifique dans le champ "directors"
+```powershell
+curl -X GET "localhost:9205/movies/_search" -H "Content-Type: application/json" -d '{
+  "query": {
+    "match": {
+      "fields.directors": "Ridley Scott"
+    }
+  }
+}'
+```
+### 3. Recherche combinée (Ridley Scott + Russell Crowe)
+```powershell
+curl -X GET "localhost:9205/movies/_search" -H "Content-Type: application/json" -d '{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "fields.directors": "Ridley Scott"
+          }
+        },
+        {
+          "match": {
+            "fields.actors": "Russell Crowe"
+          }
+        }
+      ]
+    }
+  }
+}'
+```
 
-# Premiers 10 films
-GET localhost:9205/movies/_search
+
+# Requêtes Complexes ElasticSearch
+
+## 1. Films de Ridley Scott (multi-champs)
+```json
 {
-  "size": 10
+  "query": {
+    "multi_match": {
+      "query": "Ridley Scott",
+      "fields": ["fields.directors", "fields.plot", "fields.title"]
+    }
+  }
 }
 ```
 
-### 2. Recherche simple
-```powershell
-# Recherche par titre
-GET localhost:9205/movies/_search
+## 2. Films de Ridley Scott (spécifiquement comme réalisateur)
+```json
 {
   "query": {
     "match": {
-      "fields.title": "Inception"
+      "fields.directors": "Ridley Scott"
     }
   }
 }
 ```
 
-### 3. Recherche avec filtres
-```powershell
-# Films avec une note supérieure à 8
-GET localhost:9205/movies/_search
-{
-  "query": {
-    "range": {
-      "fields.rating": {
-        "gte": 8.0
-      }
-    }
-  }
-}
-```
-
-### 4. Agrégations
-```powershell
-# Note moyenne des films
-GET localhost:9205/movies/_search
-{
-  "size": 0,
-  "aggs": {
-    "avg_rating": {
-      "avg": {
-        "field": "fields.rating"
-      }
-    }
-  }
-}
-```
-
-### 5. Recherche complexe
-```powershell
-# Films avec un acteur spécifique et une note minimum
-GET localhost:9205/movies/_search
+## 3. Films de Ridley Scott avec Russell Crowe
+```json
 {
   "query": {
     "bool": {
       "must": [
         {
           "match": {
-            "fields.actors": "Brad Pitt"
+            "fields.directors": "Ridley Scott"
+          }
+        },
+        {
+          "match": {
+            "fields.actors": "Russell Crowe"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+## 4. Films de Ridley Scott avec rank < 2000
+```json
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "fields.directors": "Ridley Scott"
           }
         },
         {
           "range": {
-            "fields.rating": {
-              "gte": 7.0
+            "fields.rank": {
+              "lt": 2000
             }
           }
         }
@@ -185,60 +217,101 @@ GET localhost:9205/movies/_search
 }
 ```
 
-## Cas pratiques
-
-1. Trouver tous les films d'un réalisateur spécifique
-2. Lister les films par genre
-3. Calculer la note moyenne par année
-4. Rechercher des films par mots-clés dans le résumé
-5. Trouver les films avec les meilleures notes pour une année donnée
-
-### Trouver tous les films d'un réalisateur spécifique
-```powershell
-GET localhost:9205/movies/_search
+## 5. Films de Ridley Scott avec rating > 6 et genre Adventure
+```json
 {
   "query": {
-    "match": {
-      "fields.directors": "Christopher Nolan"
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "fields.directors": "Ridley Scott"
+          }
+        },
+        {
+          "range": {
+            "fields.rating": {
+              "gt": 6
+            }
+          }
+        },
+        {
+          "match": {
+            "fields.genres": "Adventure"
+          }
+        }
+      ]
     }
-  },
-  "sort": [
-    {
-      "fields.year": "asc"
-    }
-  ]
+  }
 }
 ```
-### 2. Lister les films par genre
-Pour lister les films regroupés par genre, utilisez une agrégation :
 
-``` powershell
-GET localhost:9205/movies/_search
+Pour exécuter ces requêtes :
+Ou avec curl :
+```bash
+curl -X GET "localhost:9205/movies/_search" -H "Content-Type: application/json" -d '[Insérer le JSON ici]'
+```
+
+
+
+# Requêtes d'Agrégation ElasticSearch
+
+## 1. Nombre de films par année
+```json
 {
   "size": 0,
   "aggs": {
-    "films_par_genre": {
+    "films_par_annee": {
       "terms": {
-        "field": "fields.genres.keyword",
-        "size": 10
+        "field": "fields.year",
+        "size": 100,
+        "order": {
+          "_count": "desc"
+        }
       }
     }
   }
 }
 ```
 
-### 3. Calculer la note moyenne par année
-Utilisez une agrégation date_histogram pour calculer la note moyenne par année :
 
-```powershell
-GET localhost:9205/movies/_search
+## 2. Statistiques des films de Ridley Scott (rank et note moyens)
+```json
+{
+  "size": 0,
+  "query": {
+    "match": {
+      "fields.directors": "Ridley Scott"
+    }
+  },
+  "aggs": {
+    "rank_moyen": {
+      "avg": {
+        "field": "fields.rank"
+      }
+    },
+    "note_moyenne": {
+      "avg": {
+        "field": "fields.rating"
+      }
+    }
+  }
+}
+```
+
+
+## 3. Note moyenne par année (triée)
+```json
 {
   "size": 0,
   "aggs": {
-    "notes_par_année": {
-      "date_histogram": {
-        "field": "fields.release_date",
-        "calendar_interval": "year"
+    "notes_par_annee": {
+      "terms": {
+        "field": "fields.year",
+        "size": 100,
+        "order": {
+          "note_moyenne": "desc"
+        }
       },
       "aggs": {
         "note_moyenne": {
@@ -252,58 +325,120 @@ GET localhost:9205/movies/_search
 }
 ```
 
-### 4. Rechercher des films par mots-clés dans le résumé
-Si le champ summary est indexé comme text, utilisez une requête match pour effectuer une recherche par mots-clés :
 
-```powershell
-GET localhost:9205/movies/_search
+## 4. Distribution des films par plage de notes
+```json
 {
-  "query": {
-    "match": {
-      "fields.summary": "rêve braquage"
+  "size": 0,
+  "aggs": {
+    "distribution_notes": {
+      "range": {
+        "field": "fields.rating",
+        "ranges": [
+          {
+            "to": 2,
+            "key": "Très mauvais (<2)"
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "key": "Moyen (3-5)"
+          },
+          {
+            "from": 7,
+            "key": "Très bon (>7)"
+          }
+        ]
+      }
     }
   }
 }
 ```
 
-### 5. Trouver les films avec les meilleures notes pour une année donnée
-Pour trouver les films les mieux notés pour une année spécifique (par exemple, 2010), combinez une requête range et un tri :
 
+Pour exécuter ces requêtes en PowerShell :
 ```powershell
-GET localhost:9205/movies/_search
-{
-  "query": {
-    "bool": {
-      "must": [
-      {
-          "range": {
-            "fields.release_date": {
-              "gte": "2010-01-01",
-              "lte": "2010-12-31"
-            }
-          }
-        }
-      ]
-    }
-  },
-  "sort": [
-    {
-      "fields.rating": "desc"
-    }
-  ],
-  "size": 10
-}
+$query = @'
+[Insérer le JSON de la requête ici]
+'@
+Invoke-RestMethod -Method GET -Uri "http://localhost:9205/movies/_search" -ContentType "application/json" -Body $query
 ```
 
-## Conclusion
-Ce TP nous a permis de :
-- Installer et configurer Elasticsearch avec Docker
-- Comprendre la structure des données et le mapping
-- Importer des données en masse
-- Effectuer différents types de recherches et d'analyses
-- Manipuler des données réelles dans un contexte pratique
 
-## Ressources supplémentaires
-- [Documentation officielle Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html)
-- [Guide des requêtes](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html)
-- [Documentation des agrégations](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations.html)
+**Explications :**
+
+1. **Nombre de films par année**
+   - `size: 0` : ne retourne que les agrégations, pas les documents
+   - `terms` : groupe par valeur unique
+   - `order`: trie les résultats par compte descendant
+
+2. **Statistiques Ridley Scott**
+   - Combine une requête de filtrage avec des agrégations
+   - Utilise `avg` pour calculer les moyennes
+
+3. **Note moyenne par année**
+   - Agrégation imbriquée : groupe d'abord par année
+   - Calcule la moyenne des notes pour chaque groupe
+   - Trie par note moyenne décroissante
+
+4. **Distribution par plage de notes**
+   - Utilise `range` pour définir des intervalles
+   - Chaque intervalle a une clé descriptive
+   - Les bornes sont inclusives/exclusives selon leur position (from/to)
+
+**Notes importantes :**
+- `size: 0` est utilisé pour ne pas retourner les documents, seulement les agrégations
+- Les agrégations peuvent être combinées avec des requêtes normales
+- L'ordre des résultats peut être défini sur différents critères
+- Les clés personnalisées rendent les résultats plus lisibles
+
+
+
+# TP Kibana - Analyse de Films
+
+## Installation
+L'installation d'Elasticsearch et Kibana a été réalisée via Docker :
+
+```bash
+# Installation d'Elasticsearch
+docker run -p 9205:9200 -p 9305:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+```
+
+
+## Configuration et Import des Données
+1. Création d'un mapping approprié avec des champs agrégeables pour directors et genres
+2. Import des données via l'API bulk d'Elasticsearch
+3. Création d'un index pattern dans Kibana avec "fields.release_date" comme champ temporel
+
+## Discover - Analyse des Films
+
+### Films depuis 1950
+![3](https://github.com/user-attachments/assets/bf6ec4cb-9251-46a8-8e3f-1a390531a1dc)
+*Figure 1: Vue Discover montrant la distribution des films depuis 1950*
+
+Comme montré dans la capture d'écran, nous avons :
+- Utilisé le filtre `fields.year >= 1950`
+- Le graphique temporel montre la distribution des films sur la période
+- 4,706 films correspondent à ce critère
+- On observe une augmentation significative du nombre de films à partir des années 1990
+
+### Films de Ridley Scott
+![4](https://github.com/user-attachments/assets/2fad2cad-ed4c-454a-8b79-b3cb1abc9133)
+*Figure 2: Filtrage des films de Ridley Scott*
+
+
+## Création du Camembert
+
+*Figure 4: Diagramme circulaire des principaux réalisateurs et leurs genres*
+![5](https://github.com/user-attachments/assets/068875b8-c27c-4e76-a666-22c4ba5f442a)
+Pour créer le diagramme circulaire montrant les 6 principaux réalisateurs et leurs genres :
+1. Utiliser l'agrégation sur `fields.directors.keyword` (top 6)
+2. Sous-agrégation sur `fields.genres.keyword`
+3. Les données sont maintenant agrégeables grâce au mapping modifié incluant les champs `.keyword`
+
+Cette visualisation permet de voir rapidement :
+- Les réalisateurs les plus prolifiques
+- La diversité des genres pour chaque réalisateur
+- La distribution des films par genre pour chaque réalisateur
+
+*Note: Les images sont des placeholders et devraient être remplacées par les captures d'écran réelles de votre installation Kibana.*
